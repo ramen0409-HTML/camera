@@ -2,275 +2,175 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>動体検知システム</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>高信頼性 動体検知 ＆ リアルタイム監視システム</title>
+    <!-- Tailwind CSS for modern responsive layout -->
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
+        /* Modern scrollbar and fullscreen overrides */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
         }
-        body {
-            font-family: 'Helvetica Neue', Arial, sans-serif;
-            background-color: #121212;
-            color: #ffffff;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            padding: 20px;
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
         }
-        .container {
-            position: relative;
-            width: 100%;
-            max-width: 760px;
-            background: #1e1e1e;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-            display: flex;
-            flex-direction: column;
-        }
-        /* フルスクリーン（拡大時）のスタイル */
-        .container:fullscreen {
-            max-width: 100vw;
-            width: 100vw;
-            height: 100vh;
-            border-radius: 0;
-            justify-content: center;
-            background: #000;
-        }
-        /* 拡大時は下部のコントロールエリアを非表示 */
-        .container:fullscreen .controls {
-            display: none !important;
-        }
-        .video-wrapper {
-            position: relative;
-            width: 100%;
-            aspect-ratio: 4 / 3;
-            background-color: #000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .container:fullscreen .video-wrapper {
-            height: 100vh;
-            aspect-ratio: auto;
-        }
-        video {
-            display: none;
-        }
-        canvas {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
         }
         
-        /* RECボタン（画面左上配置） */
-        .rec-btn-overlay {
-            position: absolute;
-            top: 12px;
-            left: 12px;
-            z-index: 10;
-            background: rgba(255, 68, 68, 0.85);
-            color: #fff;
-            border: 1px solid rgba(255, 255, 255, 0.4);
-            border-radius: 6px;
-            padding: 8px 14px;
-            font-size: 0.85rem;
-            font-weight: bold;
-            cursor: pointer;
-            backdrop-filter: blur(4px);
-            transition: all 0.2s;
-            display: none; /* カメラ起動前は非表示 */
+        /* Fullscreen handling */
+        .video-container:fullscreen {
+            width: 100vw !important;
+            height: 100vh !important;
+            max-width: none !important;
+            border-radius: 0 !important;
+            padding: 0 !important;
+            background: #000000 !important;
+            display: flex;
             align-items: center;
-            gap: 6px;
-        }
-        .rec-btn-overlay:hover {
-            background: rgba(204, 0, 0, 0.95);
-        }
-        .rec-btn-overlay.recording {
-            background: #ff0000;
-            animation: pulse-rec 1s infinite;
-        }
-        @keyframes pulse-rec {
-            0% { opacity: 1; }
-            50% { opacity: 0.4; }
-            100% { opacity: 1; }
+            justify-content: center;
         }
 
-        /* 全画面切り替えボタン（画面右下配置） */
-        .fullscreen-btn {
-            position: absolute;
-            bottom: 12px;
-            right: 12px;
-            z-index: 10;
-            background: rgba(0, 0, 0, 0.6);
-            color: #fff;
-            border: 1px solid rgba(255, 255, 255, 0.4);
-            border-radius: 6px;
-            padding: 8px 12px;
-            font-size: 0.85rem;
-            cursor: pointer;
-            backdrop-filter: blur(4px);
-            transition: background 0.2s;
+        .video-container:-webkit-full-screen {
+            width: 100vw !important;
+            height: 100vh !important;
+            max-width: none !important;
+            border-radius: 0 !important;
+            padding: 0 !important;
+            background: #000000 !important;
             display: flex;
             align-items: center;
-            gap: 6px;
-        }
-        .fullscreen-btn:hover {
-            background: rgba(0, 0, 0, 0.85);
-            border-color: #00ffcc;
-            color: #00ffcc;
+            justify-content: center;
         }
 
-        /* 通常時のコントロールエリア */
-        .controls {
-            padding: 15px 20px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            background-color: #1e1e1e;
-            border-top: 1px solid #2a2a2a;
-            flex-wrap: wrap;
+        /* Pulse animation for REC badge */
+        @keyframes rec-pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.95); }
         }
-        .sound-setting {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-        select, input[type="file"] {
-            background-color: #2a2a2a;
-            color: #fff;
-            border: 1px solid #444;
-            padding: 6px 10px;
-            border-radius: 6px;
-            font-size: 0.85rem;
-            outline: none;
-        }
-        select:hover {
-            border-color: #00ffcc;
-        }
-        .file-upload-wrapper {
-            display: none;
-            align-items: center;
-            gap: 6px;
-        }
-        .file-upload-wrapper.active {
-            display: inline-flex;
-        }
-        button.action-btn {
-            background-color: #00ffcc;
-            color: #121212;
-            font-weight: bold;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            font-size: 0.9rem;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        button.action-btn:hover {
-            background-color: #00e6b8;
-        }
-        button.delete-btn {
-            background-color: #444;
-            color: #ff6666;
-            border: 1px solid #666;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            cursor: pointer;
-            display: none;
-        }
-        button.delete-btn:hover {
-            background-color: #555;
-            color: #ff3333;
-        }
-        .status-badge {
-            display: inline-block;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: bold;
-            background-color: #333;
-            color: #aaa;
-        }
-        .status-badge.active {
-            background-color: #00cc88;
-            color: #fff;
-        }
-        .saved-file-info {
-            font-size: 0.75rem;
-            color: #00ffcc;
-            max-width: 120px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
+        .animate-rec {
+            animation: rec-pulse 1.2s infinite ease-in-out;
         }
     </style>
 </head>
-<body>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center justify-center p-2 sm:p-4 font-sans select-none antialiased">
 
-    <div class="container" id="container">
-        <div class="video-wrapper">
-            <video id="webcam" playsinline autoplay muted></video>
-            <canvas id="outputCanvas" width="640" height="480"></canvas>
-            <canvas id="processingCanvas" width="160" height="120" style="display:none;"></canvas>
+    <!-- Main Application Wrapper -->
+    <div id="mainWrapper" class="w-full max-w-4xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col transition-all duration-300">
+        
+        <!-- Video Screen Unit (Enlarged Target) -->
+        <div id="videoContainer" class="video-container relative w-full aspect-video bg-black overflow-hidden flex items-center justify-center group">
             
-            <!-- 左上 RECボタン -->
-            <button id="recBtnOverlay" class="rec-btn-overlay">
-                <span>●</span> <span id="recBtnText">REC 録画開始</span>
+            <!-- Hidden Video Element (Source) -->
+            <video id="webcam" playsinline autoplay muted class="hidden"></video>
+            
+            <!-- Main Output Canvas (Live Video + Timestamp + Motion Box) -->
+            <canvas id="outputCanvas" class="w-full h-full object-contain bg-black block"></canvas>
+            
+            <!-- Offscreen Canvas for downscaled motion processing (Hidden) -->
+            <canvas id="processingCanvas" width="160" height="120" class="hidden"></canvas>
+
+            <!-- Camera Idle Standby Overlay -->
+            <div id="standbyOverlay" class="absolute inset-0 bg-slate-950/90 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center z-20 transition-opacity duration-300">
+                <div class="w-16 h-16 sm:w-20 sm:h-20 bg-slate-800/80 rounded-full flex items-center justify-center mb-4 border border-slate-700 shadow-inner">
+                    <svg class="w-8 h-8 sm:w-10 sm:h-10 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                    </svg>
+                </div>
+                <h2 class="text-lg sm:text-xl font-bold text-slate-100 mb-2">カメラが停止しています</h2>
+                <p class="text-xs sm:text-sm text-slate-400 max-w-md mb-6 leading-relaxed">
+                    下部の「カメラ起動」ボタンを押してください。<br class="hidden sm:inline">スマホ・PCのカメラアクセス許可メッセージが表示された場合は「許可」を選択してください。
+                </p>
+                <button id="overlayStartBtn" class="px-6 py-3 bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-slate-950 font-bold text-sm rounded-xl shadow-lg shadow-emerald-950/50 flex items-center gap-2 transition transform active:scale-95">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
+                    <span>今すぐカメラを起動する</span>
+                </button>
+            </div>
+
+            <!-- Top Left: Live REC Toggle Overlay Button -->
+            <button id="recBtnOverlay" class="absolute top-3 left-3 z-30 hidden items-center gap-2 px-3.5 py-1.5 rounded-lg bg-slate-900/80 hover:bg-slate-800 text-white text-xs font-bold border border-slate-700/80 backdrop-blur-md shadow-md transition-all active:scale-95">
+                <span id="recDot" class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+                <span id="recBtnText">REC 録画開始</span>
             </button>
 
-            <!-- 右下 広げる/元に戻すボタン -->
-            <button id="fullscreenBtn" class="fullscreen-btn">
-                <span id="fullscreenIcon">⛶</span>
+            <!-- Bottom Right: Fullscreen / Expand Overlay Button -->
+            <button id="fullscreenBtn" class="absolute bottom-3 right-3 z-30 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900/80 hover:bg-slate-800 text-slate-200 text-xs font-semibold border border-slate-700/80 backdrop-blur-md shadow-md transition-all active:scale-95">
+                <svg id="fullscreenIcon" class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
+                </svg>
                 <span id="fullscreenText">広げる</span>
             </button>
         </div>
 
-        <div class="controls">
-            <button id="startBtn" class="action-btn">カメラ起動</button>
+        <!-- Controls & Sound Settings Panel (Auto-hidden in Fullscreen mode) -->
+        <div id="controlsPanel" class="p-4 sm:p-5 bg-slate-900 border-t border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
             
-            <div class="sound-setting">
-                <label for="soundSelect" style="font-size:0.85rem; color:#ccc;">効果音:</label>
-                <select id="soundSelect">
-                    <option value="beep">ピッ (基本音)</option>
-                    <option value="pipipi">ピピピッ (通知)</option>
-                    <option value="alarm">警報 (サイレン)</option>
-                    <option value="custom">カスタム (保存音源)</option>
-                </select>
+            <!-- Left Side: Camera Activation & Status -->
+            <div class="flex items-center justify-between sm:justify-start gap-3">
+                <button id="startBtn" class="flex-1 sm:flex-initial px-5 py-2.5 bg-cyan-500 hover:bg-cyan-400 active:bg-cyan-600 text-slate-950 font-bold text-sm rounded-xl shadow-md transition transform active:scale-95 flex items-center justify-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                    <span>カメラ起動</span>
+                </button>
 
-                <div id="fileWrapper" class="file-upload-wrapper">
-                    <input type="file" id="audioFile" accept="audio/*">
-                    <span id="savedFileName" class="saved-file-info"></span>
-                    <button id="deleteSoundBtn" class="delete-btn">削除</button>
+                <div id="statusBadge" class="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs font-semibold text-slate-400 flex items-center gap-2">
+                    <span id="statusIndicator" class="w-2 h-2 rounded-full bg-slate-500"></span>
+                    <span id="statusText">停止中</span>
                 </div>
             </div>
 
-            <span id="status" class="status-badge">停止中</span>
+            <!-- Right Side: Sound Alert Configuration -->
+            <div class="flex flex-wrap items-center gap-2 sm:gap-3 bg-slate-950/60 p-2 sm:p-2.5 rounded-xl border border-slate-800/80">
+                <label for="soundSelect" class="text-xs font-semibold text-slate-400 pl-1">アラート音:</label>
+                <select id="soundSelect" class="bg-slate-800 text-slate-200 border border-slate-700 rounded-lg text-xs px-2.5 py-1.5 focus:outline-none focus:border-cyan-500 transition">
+                    <option value="beep">ピッ (基本音)</option>
+                    <option value="pipipi">ピピピッ (通知)</option>
+                    <option value="alarm">警報サイレン</option>
+                    <option value="custom">カスタム音源 (保存可能)</option>
+                </select>
+
+                <!-- Custom Sound File Uploader & Delete Button -->
+                <div id="fileWrapper" class="hidden items-center gap-2">
+                    <label for="audioFile" class="cursor-pointer bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs px-2.5 py-1.5 rounded-lg transition">
+                        ファイル選択
+                    </label>
+                    <input type="file" id="audioFile" accept="audio/*" class="hidden">
+                    
+                    <span id="savedFileName" class="text-xs text-cyan-400 max-w-[100px] truncate font-mono"></span>
+                    
+                    <button id="deleteSoundBtn" class="hidden px-2 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs rounded-md font-semibold transition">
+                        削除
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
-        const container = document.getElementById('container');
+        // DOM Elements Initialization
+        const mainWrapper = document.getElementById('mainWrapper');
+        const videoContainer = document.getElementById('videoContainer');
+        const controlsPanel = document.getElementById('controlsPanel');
         const video = document.getElementById('webcam');
         const outputCanvas = document.getElementById('outputCanvas');
         const outputCtx = outputCanvas.getContext('2d');
         const processingCanvas = document.getElementById('processingCanvas');
         const processingCtx = processingCanvas.getContext('2d', { willReadFrequently: true });
-        
+
+        const standbyOverlay = document.getElementById('standbyOverlay');
+        const overlayStartBtn = document.getElementById('overlayStartBtn');
         const startBtn = document.getElementById('startBtn');
+        const statusBadge = document.getElementById('statusBadge');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+
         const recBtnOverlay = document.getElementById('recBtnOverlay');
+        const recDot = document.getElementById('recDot');
         const recBtnText = document.getElementById('recBtnText');
         const fullscreenBtn = document.getElementById('fullscreenBtn');
-        const fullscreenText = document.getElementById('fullscreenText');
         const fullscreenIcon = document.getElementById('fullscreenIcon');
-        const statusBadge = document.getElementById('status');
+        const fullscreenText = document.getElementById('fullscreenText');
 
         const soundSelect = document.getElementById('soundSelect');
         const fileWrapper = document.getElementById('fileWrapper');
@@ -278,24 +178,25 @@
         const savedFileName = document.getElementById('savedFileName');
         const deleteSoundBtn = document.getElementById('deleteSoundBtn');
 
+        // State Flags
         let isRunning = false;
         let prevFrame = null;
         let audioCtx = null;
         let audioDestination = null;
         let lastSoundTime = 0;
         let customAudioBuffer = null;
-        const SOUND_COOLDOWN = 300;
+        const SOUND_COOLDOWN = 350; // ms
 
         let mediaRecorder = null;
         let recordedChunks = [];
         let isRecording = false;
 
-        const threshold = 30;
+        const motionThreshold = 28;
         const sampleWidth = 160;
         const sampleHeight = 120;
 
-        // --- IndexedDB ---
-        const DB_NAME = 'MotionDetectorSoundDB';
+        // --- IndexedDB for Custom Sound Persistence ---
+        const DB_NAME = 'MotionDetectorSoundDB_v2';
         const STORE_NAME = 'sounds';
 
         function openDB() {
@@ -313,46 +214,54 @@
         }
 
         async function saveSoundToDB(arrayBuffer, fileName) {
-            const db = await openDB();
-            const tx = db.transaction(STORE_NAME, 'readwrite');
-            const store = tx.objectStore(STORE_NAME);
-            store.put({ buffer: arrayBuffer, name: fileName }, 'customSound');
+            try {
+                const db = await openDB();
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                tx.objectStore(STORE_NAME).put({ buffer: arrayBuffer, name: fileName }, 'customSound');
+            } catch (err) {
+                console.error('IndexedDB Save Error:', err);
+            }
         }
 
         async function deleteSoundFromDB() {
-            const db = await openDB();
-            const tx = db.transaction(STORE_NAME, 'readwrite');
-            const store = tx.objectStore(STORE_NAME);
-            store.delete('customSound');
+            try {
+                const db = await openDB();
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                tx.objectStore(STORE_NAME).delete('customSound');
+            } catch (err) {
+                console.error('IndexedDB Delete Error:', err);
+            }
         }
 
         async function loadSoundFromDB() {
             try {
                 const db = await openDB();
                 const tx = db.transaction(STORE_NAME, 'readonly');
-                const store = tx.objectStore(STORE_NAME);
-                const req = store.get('customSound');
+                const req = tx.objectStore(STORE_NAME).get('customSound');
                 req.onsuccess = async () => {
                     if (req.result) {
                         if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                         const decodedData = await audioCtx.decodeAudioData(req.result.buffer.slice(0));
                         customAudioBuffer = decodedData;
                         savedFileName.textContent = req.result.name;
-                        deleteSoundBtn.style.display = 'inline-block';
+                        deleteSoundBtn.classList.remove('hidden');
                     }
                 };
             } catch (err) {
-                console.warn('保存された音源のロードに失敗:', err);
+                console.warn('Failed to load custom sound from IndexedDB:', err);
             }
         }
 
         loadSoundFromDB();
 
+        // UI Event Listeners for Sound Select
         soundSelect.addEventListener('change', (e) => {
             if (e.target.value === 'custom') {
-                fileWrapper.classList.add('active');
+                fileWrapper.classList.remove('hidden');
+                fileWrapper.classList.add('flex');
             } else {
-                fileWrapper.classList.remove('active');
+                fileWrapper.classList.add('hidden');
+                fileWrapper.classList.remove('flex');
             }
         });
 
@@ -362,14 +271,18 @@
 
             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-            const arrayBuffer = await file.arrayBuffer();
-            await saveSoundToDB(arrayBuffer, file.name);
-            savedFileName.textContent = file.name;
-            deleteSoundBtn.style.display = 'inline-block';
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                await saveSoundToDB(arrayBuffer, file.name);
+                savedFileName.textContent = file.name;
+                deleteSoundBtn.classList.remove('hidden');
 
-            audioCtx.decodeAudioData(arrayBuffer.slice(0), (buffer) => {
-                customAudioBuffer = buffer;
-            });
+                audioCtx.decodeAudioData(arrayBuffer.slice(0), (buffer) => {
+                    customAudioBuffer = buffer;
+                });
+            } catch (err) {
+                alert('音声ファイルの読み込みに失敗しました。別の形式を試してください。');
+            }
         });
 
         deleteSoundBtn.addEventListener('click', async () => {
@@ -377,8 +290,7 @@
             customAudioBuffer = null;
             savedFileName.textContent = '';
             audioFileInput.value = '';
-            deleteSoundBtn.style.display = 'none';
-            alert('カスタム音源を削除しました。');
+            deleteSoundBtn.classList.add('hidden');
         });
 
         function connectToDestinations(node) {
@@ -394,6 +306,7 @@
             lastSoundTime = now;
 
             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
 
             const mode = soundSelect.value;
 
@@ -402,7 +315,7 @@
                 const gain = audioCtx.createGain();
                 osc.type = 'sine';
                 osc.frequency.setValueAtTime(1046.5, audioCtx.currentTime);
-                gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
                 osc.connect(gain);
                 connectToDestinations(gain);
@@ -416,7 +329,7 @@
                     const startTime = audioCtx.currentTime + (i * 0.07);
                     osc.type = 'sine';
                     osc.frequency.setValueAtTime(1200, startTime);
-                    gain.gain.setValueAtTime(0.12, startTime);
+                    gain.gain.setValueAtTime(0.15, startTime);
                     gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.05);
                     osc.connect(gain);
                     connectToDestinations(gain);
@@ -430,7 +343,7 @@
                 osc.type = 'sawtooth';
                 osc.frequency.setValueAtTime(600, audioCtx.currentTime);
                 osc.frequency.linearRampToValueAtTime(1200, audioCtx.currentTime + 0.2);
-                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
                 osc.connect(gain);
                 connectToDestinations(gain);
@@ -446,42 +359,76 @@
         }
 
         async function startCamera() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+            let stream = null;
+
+            // Step 1: Ideal constraints attempt
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
                     audio: true
                 });
-                
-                video.srcObject = stream;
-                
-                await new Promise((resolve) => {
-                    video.onloadedmetadata = () => {
-                        video.play();
-                        resolve();
-                    };
-                });
-
-                outputCanvas.width = video.videoWidth || 640;
-                outputCanvas.height = video.videoHeight || 480;
-
-                isRunning = true;
-                statusBadge.textContent = '監視中';
-                statusBadge.classList.add('active');
-                startBtn.style.display = 'none';
-                recBtnOverlay.style.display = 'inline-flex';
-
-                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                audioDestination = audioCtx.createMediaStreamDestination();
-
-                const micSource = audioCtx.createMediaStreamSource(stream);
-                micSource.connect(audioDestination);
-
-            } catch (err) {
-                alert('カメラまたはマイクの読み込みに失敗しました。アクセスを許可してください。');
-                console.error(err);
+            } catch (err1) {
+                console.warn('Ideal camera constraints failed, attempting basic fallback:', err1);
+                // Step 2: Fallback attempt without rigid constraints
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        video: true,
+                        audio: true
+                    });
+                } catch (err2) {
+                    // Step 3: Fallback without audio if audio permission was rejected
+                    try {
+                        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    } catch (err3) {
+                        alert('カメラにアクセスできませんでした。\nブラウザのURL横の鍵マークからカメラへのアクセス許可を「ON」にして再読み込みしてください。');
+                        console.error('Final camera access error:', err3);
+                        return;
+                    }
+                }
             }
+
+            video.srcObject = stream;
+
+            // Wait until video metadata and actual playback dimension are ready
+            await new Promise((resolve) => {
+                video.onloadedmetadata = () => {
+                    video.play().then(resolve).catch(resolve);
+                };
+            });
+
+            // Adjust Canvas Dimensions dynamically
+            outputCanvas.width = video.videoWidth || 640;
+            outputCanvas.height = video.videoHeight || 480;
+
+            // Setup audio destination stream for WebM recorder
+            audioDestination = audioCtx.createMediaStreamDestination();
+            try {
+                if (stream.getAudioTracks().length > 0) {
+                    const micSource = audioCtx.createMediaStreamSource(stream);
+                    micSource.connect(audioDestination);
+                }
+            } catch (e) {
+                console.warn('Audio tracking setup failed:', e);
+            }
+
+            isRunning = true;
+
+            // UI updates
+            standbyOverlay.classList.add('opacity-0', 'pointer-events-none');
+            recBtnOverlay.classList.remove('hidden');
+            recBtnOverlay.classList.add('flex');
+
+            statusIndicator.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
+            statusText.textContent = '監視中';
+            statusText.className = 'text-emerald-400 font-bold';
+            
+            startBtn.classList.add('hidden');
         }
 
+        // Formatting timestamp for filename & display
         function getFormattedDateTime() {
             const now = new Date();
             const yyyy = now.getFullYear();
@@ -507,22 +454,34 @@
         function toggleRecording() {
             if (!isRecording) {
                 const canvasStream = outputCanvas.captureStream(30);
-                const combinedStream = new MediaStream([
-                    ...canvasStream.getVideoTracks(),
-                    ...audioDestination.stream.getAudioTracks()
-                ]);
+                const combinedTracks = [...canvasStream.getVideoTracks()];
 
+                if (audioDestination && audioDestination.stream.getAudioTracks().length > 0) {
+                    combinedTracks.push(...audioDestination.stream.getAudioTracks());
+                }
+
+                const combinedStream = new MediaStream(combinedTracks);
                 recordedChunks = [];
-                mediaRecorder = new MediaRecorder(combinedStream, { mimeType: 'video/webm' });
+
+                let options = { mimeType: 'video/webm' };
+                if (!MediaRecorder.isTypeSupported('video/webm')) {
+                    options = { mimeType: 'video/mp4' };
+                }
+
+                try {
+                    mediaRecorder = new MediaRecorder(combinedStream, options);
+                } catch (e) {
+                    mediaRecorder = new MediaRecorder(combinedStream);
+                }
 
                 mediaRecorder.ondataavailable = (e) => {
-                    if (e.data.size > 0) recordedChunks.push(e.data);
+                    if (e.data && e.data.size > 0) recordedChunks.push(e.data);
                 };
 
                 const startTimestamp = getFormattedDateTime();
 
                 mediaRecorder.onstop = () => {
-                    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                    const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/webm' });
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.style.display = 'none';
@@ -536,23 +495,34 @@
                     }, 100);
                 };
 
-                mediaRecorder.start();
+                mediaRecorder.start(1000);
                 isRecording = true;
                 recBtnText.textContent = '■ 録画停止';
-                recBtnOverlay.classList.add('recording');
+                recDot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500 animate-rec';
+                recBtnOverlay.classList.add('border-rose-500/80', 'bg-rose-950/80');
             } else {
                 mediaRecorder.stop();
                 isRecording = false;
                 recBtnText.textContent = 'REC 録画開始';
-                recBtnOverlay.classList.remove('recording');
+                recDot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500';
+                recBtnOverlay.classList.remove('border-rose-500/80', 'bg-rose-950/80');
             }
         }
 
-        // メイン処理ループ（起動前でも時間を描画し続ける）
         function processFrame() {
-            if (isRunning && video.readyState === video.HAVE_ENOUGH_DATA) {
+            // Check if live camera stream is ready
+            if (isRunning && video.readyState >= 2 && video.videoWidth > 0) {
+                
+                // Synchronize output canvas aspect with stream
+                if (outputCanvas.width !== video.videoWidth || outputCanvas.height !== video.videoHeight) {
+                    outputCanvas.width = video.videoWidth;
+                    outputCanvas.height = video.videoHeight;
+                }
+
+                // Render current camera frame
                 outputCtx.drawImage(video, 0, 0, outputCanvas.width, outputCanvas.height);
 
+                // Downscale & process motion on offscreen canvas
                 processingCtx.drawImage(video, 0, 0, sampleWidth, sampleHeight);
                 const currentFrame = processingCtx.getImageData(0, 0, sampleWidth, sampleHeight);
 
@@ -563,18 +533,18 @@
                     let maxY = 0;
                     let detectedPixels = 0;
 
-                    const data1 = prevFrame.data;
-                    const data2 = currentFrame.data;
+                    const d1 = prevFrame.data;
+                    const d2 = currentFrame.data;
 
-                    for (let i = 0; i < data1.length; i += 4) {
-                        const diff = (Math.abs(data1[i] - data2[i]) + 
-                                      Math.abs(data1[i+1] - data2[i+1]) + 
-                                      Math.abs(data1[i+2] - data2[i+2])) / 3;
+                    for (let i = 0; i < d1.length; i += 4) {
+                        const diff = (Math.abs(d1[i] - d2[i]) + 
+                                      Math.abs(d1[i+1] - d2[i+1]) + 
+                                      Math.abs(d1[i+2] - d2[i+2])) / 3;
 
-                        if (diff > threshold) {
-                            const pixelIndex = i / 4;
-                            const x = pixelIndex % sampleWidth;
-                            const y = Math.floor(pixelIndex / sampleWidth);
+                        if (diff > motionThreshold) {
+                            const pixelIdx = i / 4;
+                            const x = pixelIdx % sampleWidth;
+                            const y = Math.floor(pixelIdx / sampleWidth);
 
                             if (x < minX) minX = x;
                             if (x > maxX) maxX = x;
@@ -585,60 +555,66 @@
                         }
                     }
 
-                    if (detectedPixels > 25) {
+                    // Motion threshold trigger
+                    if (detectedPixels > 20) {
                         const scaleX = outputCanvas.width / sampleWidth;
                         const scaleY = outputCanvas.height / sampleHeight;
 
                         const rectX = minX * scaleX;
                         const rectY = minY * scaleY;
-                        const rectWidth = (maxX - minX) * scaleX;
-                        const rectHeight = (maxY - minY) * scaleY;
+                        const rectW = Math.max((maxX - minX) * scaleX, 20);
+                        const rectH = Math.max((maxY - minY) * scaleY, 20);
 
+                        // Draw bounding box on active canvas
                         outputCtx.strokeStyle = '#00ffcc';
-                        outputCtx.lineWidth = 4;
-                        outputCtx.strokeRect(rectX, rectY, rectWidth, rectHeight);
+                        outputCtx.lineWidth = Math.max(3, Math.round(outputCanvas.width / 200));
+                        outputCtx.strokeRect(rectX, rectY, rectW, rectH);
 
                         playSound();
                     }
                 }
                 prevFrame = currentFrame;
-            } else if (!isRunning) {
-                // 停止時は黒背景を描画
-                outputCtx.fillStyle = '#000000';
+
+            } else {
+                // Standby / Fallback black screen canvas fill
+                if (outputCanvas.width === 0) outputCanvas.width = 640;
+                if (outputCanvas.height === 0) outputCanvas.height = 480;
+
+                outputCtx.fillStyle = '#0f172a';
                 outputCtx.fillRect(0, 0, outputCanvas.width, outputCanvas.height);
             }
 
-            // --- 時間表示（常に描画） ---
             const timestampText = getDisplayText();
-            outputCtx.font = 'bold 14px monospace';
-            
-            const paddingX = 8;
-            const paddingY = 6;
-            const textWidth = outputCtx.measureText(timestampText).width;
-            const textHeight = 14;
-            
-            const rectX = 10;
-            const rectY = outputCanvas.height - textHeight - (paddingY * 2) - 10;
-            const rectW = textWidth + (paddingX * 2);
-            const rectH = textHeight + (paddingY * 2);
+            const fontSize = Math.max(12, Math.round(outputCanvas.height / 32));
+            outputCtx.font = `bold ${fontSize}px monospace`;
 
-            // 文字背景
-            outputCtx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+            const paddingX = fontSize * 0.6;
+            const paddingY = fontSize * 0.4;
+            const textWidth = outputCtx.measureText(timestampText).width;
+
+            const boxMargin = fontSize * 0.8;
+            const rectX = boxMargin;
+            const rectY = outputCanvas.height - fontSize - (paddingY * 2) - boxMargin;
+            const rectW = textWidth + (paddingX * 2);
+            const rectH = fontSize + (paddingY * 2);
+
+            // Dark semi-transparent box background
+            outputCtx.fillStyle = 'rgba(0, 0, 0, 0.75)';
             outputCtx.fillRect(rectX, rectY, rectW, rectH);
-            
-            // 白文字
+
+            // White text
             outputCtx.fillStyle = '#ffffff';
-            outputCtx.fillText(timestampText, rectX + paddingX, rectY + textHeight + (paddingY / 2));
+            outputCtx.fillText(timestampText, rectX + paddingX, rectY + fontSize + (paddingY / 4));
 
             requestAnimationFrame(processFrame);
         }
 
         function toggleFullscreen() {
-            if (!document.fullscreenElement) {
-                if (container.requestFullscreen) {
-                    container.requestFullscreen();
-                } else if (container.webkitRequestFullscreen) {
-                    container.webkitRequestFullscreen();
+            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                if (videoContainer.requestFullscreen) {
+                    videoContainer.requestFullscreen();
+                } else if (videoContainer.webkitRequestFullscreen) {
+                    videoContainer.webkitRequestFullscreen();
                 }
             } else {
                 if (document.exitFullscreen) {
@@ -649,25 +625,12 @@
             }
         }
 
-        document.addEventListener('fullscreenchange', updateFullscreenBtn);
-        document.addEventListener('webkitfullscreenchange', updateFullscreenBtn);
-
-        function updateFullscreenBtn() {
-            if (document.fullscreenElement || document.webkitFullscreenElement) {
+        function handleFullscreenChange() {
+            const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement);
+            if (isFS) {
+                controlsPanel.classList.add('hidden');
                 fullscreenText.textContent = '元に戻す';
-                fullscreenIcon.textContent = '🗗';
             } else {
+                controlsPanel.classList.remove('hidden');
                 fullscreenText.textContent = '広げる';
-                fullscreenIcon.textContent = '⛶';
             }
-        }
-
-        startBtn.addEventListener('click', startCamera);
-        recBtnOverlay.addEventListener('click', toggleRecording);
-        fullscreenBtn.addEventListener('click', toggleFullscreen);
-
-        // ループ開始
-        requestAnimationFrame(processFrame);
-    </script>
-</body>
-</html>

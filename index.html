@@ -66,11 +66,17 @@
             object-fit: contain;
         }
         
-        .rec-btn-overlay {
+        /* 画面左上のボタンエリア */
+        .top-overlay-btns {
             position: absolute;
             top: 12px;
             left: 12px;
             z-index: 10;
+            display: flex;
+            gap: 8px;
+        }
+
+        .rec-btn-overlay {
             background: rgba(255, 68, 68, 0.9);
             color: #fff;
             border: 1px solid rgba(255, 255, 255, 0.4);
@@ -92,6 +98,24 @@
             0% { opacity: 1; }
             50% { opacity: 0.4; }
             100% { opacity: 1; }
+        }
+
+        .mute-btn-overlay {
+            background: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+            display: none;
+            align-items: center;
+            gap: 6px;
+        }
+        .mute-btn-overlay.is-muted {
+            background: rgba(255, 153, 0, 0.9);
+            border-color: #ff9900;
         }
 
         .fullscreen-btn {
@@ -155,7 +179,7 @@
             font-size: 0.9rem;
             cursor: pointer;
         }
-        button.switch-btn {
+        button.switch-btn, button.mute-ctrl-btn {
             background-color: #333;
             color: #fff;
             border: 1px solid #555;
@@ -165,9 +189,15 @@
             cursor: pointer;
             display: none;
         }
-        button.switch-btn:hover {
+        button.switch-btn:hover, button.mute-ctrl-btn:hover {
             background-color: #444;
             border-color: #00ffcc;
+        }
+        button.mute-ctrl-btn.is-muted {
+            background-color: #ff9900;
+            color: #000;
+            font-weight: bold;
+            border-color: #ff9900;
         }
         button.delete-btn {
             background-color: #444;
@@ -210,9 +240,15 @@
             <canvas id="outputCanvas" width="640" height="480"></canvas>
             <canvas id="processingCanvas" width="160" height="120" style="display:none;"></canvas>
             
-            <button id="recBtnOverlay" class="rec-btn-overlay">
-                <span>●</span> <span id="recBtnText">REC 録画開始</span>
-            </button>
+            <div class="top-overlay-btns">
+                <button id="recBtnOverlay" class="rec-btn-overlay">
+                    <span>●</span> <span id="recBtnText">REC 録画開始</span>
+                </button>
+
+                <button id="muteBtnOverlay" class="mute-btn-overlay">
+                    <span id="muteOverlayIcon">🔊</span> <span id="muteOverlayText">音あり</span>
+                </button>
+            </div>
 
             <button id="fullscreenBtn" class="fullscreen-btn">
                 <span id="fullscreenIcon">⛶</span>
@@ -223,6 +259,7 @@
         <div class="controls">
             <button id="startBtn" class="action-btn">カメラ起動</button>
             <button id="switchCamBtn" class="switch-btn">🔄 カメラ切り替え</button>
+            <button id="muteBtnCtrl" class="mute-ctrl-btn">🔊 音あり</button>
             
             <div class="sound-setting">
                 <label for="soundSelect" style="font-size:0.85rem; color:#ccc;">効果音:</label>
@@ -254,6 +291,11 @@
         
         const startBtn = document.getElementById('startBtn');
         const switchCamBtn = document.getElementById('switchCamBtn');
+        const muteBtnCtrl = document.getElementById('muteBtnCtrl');
+        const muteBtnOverlay = document.getElementById('muteBtnOverlay');
+        const muteOverlayIcon = document.getElementById('muteOverlayIcon');
+        const muteOverlayText = document.getElementById('muteOverlayText');
+        
         const recBtnOverlay = document.getElementById('recBtnOverlay');
         const recBtnText = document.getElementById('recBtnText');
         const fullscreenBtn = document.getElementById('fullscreenBtn');
@@ -268,11 +310,12 @@
         const deleteSoundBtn = document.getElementById('deleteSoundBtn');
 
         let isRunning = false;
+        let isMuted = false;
         let prevFrame = null;
         let audioCtx = null;
         let audioDestination = null;
         let currentStream = null;
-        let currentFacingMode = 'user'; // 'user' (インカメラ) または 'environment' (アウトカメラ)
+        let currentFacingMode = 'user';
         let lastSoundTime = 0;
         let customAudioBuffer = null;
         const SOUND_COOLDOWN = 300;
@@ -376,6 +419,25 @@
             alert('カスタム音源を削除しました。');
         });
 
+        function toggleMute() {
+            isMuted = !isMuted;
+            if (isMuted) {
+                muteBtnCtrl.textContent = '🔇 ミュート';
+                muteBtnCtrl.classList.add('is-muted');
+                
+                muteOverlayIcon.textContent = '🔇';
+                muteOverlayText.textContent = '消音中';
+                muteBtnOverlay.classList.add('is-muted');
+            } else {
+                muteBtnCtrl.textContent = '🔊 音あり';
+                muteBtnCtrl.classList.remove('is-muted');
+                
+                muteOverlayIcon.textContent = '🔊';
+                muteOverlayText.textContent = '音あり';
+                muteBtnOverlay.classList.remove('is-muted');
+            }
+        }
+
         function connectToDestinations(node) {
             if (!audioCtx) return;
             node.connect(audioCtx.destination);
@@ -385,6 +447,8 @@
         }
 
         function playSound() {
+            if (isMuted) return; // ミュート時は鳴らさない
+
             const now = Date.now();
             if (now - lastSoundTime < SOUND_COOLDOWN) return;
             lastSoundTime = now;
@@ -443,7 +507,6 @@
         }
 
         async function initCameraStream(facingMode) {
-            // 既存のトラックを停止
             if (currentStream) {
                 currentStream.getTracks().forEach(track => track.stop());
             }
@@ -488,7 +551,10 @@
                 statusBadge.classList.add('active');
                 startBtn.style.display = 'none';
                 switchCamBtn.style.display = 'inline-block';
+                muteBtnCtrl.style.display = 'inline-block';
+                
                 recBtnOverlay.style.display = 'inline-flex';
+                muteBtnOverlay.style.display = 'inline-flex';
 
             } catch (err) {
                 alert('カメラの起動に失敗しました。アクセスを許可してください。');
@@ -499,7 +565,6 @@
         async function switchCamera() {
             if (!isRunning) return;
             
-            // 切り替え中は録画を一時停止・安全終了
             if (isRecording) {
                 toggleRecording();
                 alert('カメラ切り替えのため録画を一度保存しました。');
@@ -509,7 +574,7 @@
             
             try {
                 await initCameraStream(currentFacingMode);
-                prevFrame = null; // 比較用の前フレームをリセット
+                prevFrame = null;
             } catch(e) {
                 alert('カメラの切り替えに失敗しました。');
                 console.error(e);
@@ -606,7 +671,6 @@
 
                 outputCtx.save();
                 
-                // 前面（イン）カメラ時は見やすいように鏡像（反転）処理
                 if (currentFacingMode === 'user') {
                     outputCtx.translate(outputCanvas.width, 0);
                     outputCtx.scale(-1, 1);
@@ -710,6 +774,8 @@
 
         startBtn.addEventListener('click', startCamera);
         switchCamBtn.addEventListener('click', switchCamera);
+        muteBtnCtrl.addEventListener('click', toggleMute);
+        muteBtnOverlay.addEventListener('click', toggleMute);
         recBtnOverlay.addEventListener('click', toggleRecording);
         fullscreenBtn.addEventListener('click', toggleFullscreen);
 

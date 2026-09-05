@@ -50,6 +50,9 @@
             width: 100%;
             aspect-ratio: 4 / 3;
             background-color: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         .container:fullscreen .video-wrapper {
             height: 100vh;
@@ -59,9 +62,6 @@
             display: none;
         }
         canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
             width: 100%;
             height: 100%;
             object-fit: contain;
@@ -218,8 +218,8 @@
     <div class="container" id="container">
         <div class="video-wrapper">
             <video id="webcam" playsinline autoplay muted></video>
-            <canvas id="outputCanvas"></canvas>
-            <canvas id="processingCanvas" style="display:none;"></canvas>
+            <canvas id="outputCanvas" width="640" height="480"></canvas>
+            <canvas id="processingCanvas" width="160" height="120" style="display:none;"></canvas>
             
             <!-- 左上 RECボタン -->
             <button id="recBtnOverlay" class="rec-btn-overlay">
@@ -293,9 +293,6 @@
         const threshold = 30;
         const sampleWidth = 160;
         const sampleHeight = 120;
-
-        processingCanvas.width = sampleWidth;
-        processingCanvas.height = sampleHeight;
 
         // --- IndexedDB ---
         const DB_NAME = 'MotionDetectorSoundDB';
@@ -458,11 +455,14 @@
                 video.srcObject = stream;
                 
                 await new Promise((resolve) => {
-                    video.onloadedmetadata = () => resolve();
+                    video.onloadedmetadata = () => {
+                        video.play();
+                        resolve();
+                    };
                 });
 
-                outputCanvas.width = video.videoWidth;
-                outputCanvas.height = video.videoHeight;
+                outputCanvas.width = video.videoWidth || 640;
+                outputCanvas.height = video.videoHeight || 480;
 
                 isRunning = true;
                 statusBadge.textContent = '監視中';
@@ -476,9 +476,8 @@
                 const micSource = audioCtx.createMediaStreamSource(stream);
                 micSource.connect(audioDestination);
 
-                requestAnimationFrame(processFrame);
             } catch (err) {
-                alert('カメラまたはマイクへのアクセスが拒否されました。');
+                alert('カメラまたはマイクの読み込みに失敗しました。アクセスを許可してください。');
                 console.error(err);
             }
         }
@@ -549,63 +548,69 @@
             }
         }
 
+        // メイン処理ループ（起動前でも時間を描画し続ける）
         function processFrame() {
-            if (!isRunning) return;
+            if (isRunning && video.readyState === video.HAVE_ENOUGH_DATA) {
+                outputCtx.drawImage(video, 0, 0, outputCanvas.width, outputCanvas.height);
 
-            outputCtx.drawImage(video, 0, 0, outputCanvas.width, outputCanvas.height);
+                processingCtx.drawImage(video, 0, 0, sampleWidth, sampleHeight);
+                const currentFrame = processingCtx.getImageData(0, 0, sampleWidth, sampleHeight);
 
-            processingCtx.drawImage(video, 0, 0, sampleWidth, sampleHeight);
-            const currentFrame = processingCtx.getImageData(0, 0, sampleWidth, sampleHeight);
+                if (prevFrame) {
+                    let minX = sampleWidth;
+                    let minY = sampleHeight;
+                    let maxX = 0;
+                    let maxY = 0;
+                    let detectedPixels = 0;
 
-            if (prevFrame) {
-                let minX = sampleWidth;
-                let minY = sampleHeight;
-                let maxX = 0;
-                let maxY = 0;
-                let detectedPixels = 0;
+                    const data1 = prevFrame.data;
+                    const data2 = currentFrame.data;
 
-                const data1 = prevFrame.data;
-                const data2 = currentFrame.data;
+                    for (let i = 0; i < data1.length; i += 4) {
+                        const diff = (Math.abs(data1[i] - data2[i]) + 
+                                      Math.abs(data1[i+1] - data2[i+1]) + 
+                                      Math.abs(data1[i+2] - data2[i+2])) / 3;
 
-                for (let i = 0; i < data1.length; i += 4) {
-                    const diff = (Math.abs(data1[i] - data2[i]) + 
-                                  Math.abs(data1[i+1] - data2[i+1]) + 
-                                  Math.abs(data1[i+2] - data2[i+2])) / 3;
+                        if (diff > threshold) {
+                            const pixelIndex = i / 4;
+                            const x = pixelIndex % sampleWidth;
+                            const y = Math.floor(pixelIndex / sampleWidth);
 
-                    if (diff > threshold) {
-                        const pixelIndex = i / 4;
-                        const x = pixelIndex % sampleWidth;
-                        const y = Math.floor(pixelIndex / sampleWidth);
+                            if (x < minX) minX = x;
+                            if (x > maxX) maxX = x;
+                            if (y < minY) minY = y;
+                            if (y > maxY) maxY = y;
 
-                        if (x < minX) minX = x;
-                        if (x > maxX) maxX = x;
-                        if (y < minY) minY = y;
-                        if (y > maxY) maxY = y;
+                            detectedPixels++;
+                        }
+                    }
 
-                        detectedPixels++;
+                    if (detectedPixels > 25) {
+                        const scaleX = outputCanvas.width / sampleWidth;
+                        const scaleY = outputCanvas.height / sampleHeight;
+
+                        const rectX = minX * scaleX;
+                        const rectY = minY * scaleY;
+                        const rectWidth = (maxX - minX) * scaleX;
+                        const rectHeight = (maxY - minY) * scaleY;
+
+                        outputCtx.strokeStyle = '#00ffcc';
+                        outputCtx.lineWidth = 4;
+                        outputCtx.strokeRect(rectX, rectY, rectWidth, rectHeight);
+
+                        playSound();
                     }
                 }
-
-                if (detectedPixels > 25) {
-                    const scaleX = outputCanvas.width / sampleWidth;
-                    const scaleY = outputCanvas.height / sampleHeight;
-
-                    const rectX = minX * scaleX;
-                    const rectY = minY * scaleY;
-                    const rectWidth = (maxX - minX) * scaleX;
-                    const rectHeight = (maxY - minY) * scaleY;
-
-                    outputCtx.strokeStyle = '#00ffcc';
-                    outputCtx.lineWidth = 4;
-                    outputCtx.strokeRect(rectX, rectY, rectWidth, rectHeight);
-
-                    playSound();
-                }
+                prevFrame = currentFrame;
+            } else if (!isRunning) {
+                // 停止時は黒背景を描画
+                outputCtx.fillStyle = '#000000';
+                outputCtx.fillRect(0, 0, outputCanvas.width, outputCanvas.height);
             }
 
-            // --- 時間表示（小さめの文字サイズ & 常に画面左下固定） ---
+            // --- 時間表示（常に描画） ---
             const timestampText = getDisplayText();
-            outputCtx.font = 'bold 14px monospace'; // フォントを小さく設定
+            outputCtx.font = 'bold 14px monospace';
             
             const paddingX = 8;
             const paddingY = 6;
@@ -617,15 +622,14 @@
             const rectW = textWidth + (paddingX * 2);
             const rectH = textHeight + (paddingY * 2);
 
-            // 文字の黒背景
+            // 文字背景
             outputCtx.fillStyle = 'rgba(0, 0, 0, 0.65)';
             outputCtx.fillRect(rectX, rectY, rectW, rectH);
             
-            // 白文字描画
+            // 白文字
             outputCtx.fillStyle = '#ffffff';
             outputCtx.fillText(timestampText, rectX + paddingX, rectY + textHeight + (paddingY / 2));
 
-            prevFrame = currentFrame;
             requestAnimationFrame(processFrame);
         }
 
@@ -661,6 +665,9 @@
         startBtn.addEventListener('click', startCamera);
         recBtnOverlay.addEventListener('click', toggleRecording);
         fullscreenBtn.addEventListener('click', toggleFullscreen);
+
+        // ループ開始
+        requestAnimationFrame(processFrame);
     </script>
 </body>
 </html>
